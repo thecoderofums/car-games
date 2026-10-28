@@ -39,6 +39,7 @@
 
     #car {
       position: absolute;
+      z-index: 1; /* stay above #track, which is painted after it */
       width: 40px;
       height: 80px;
       background-color: red;

@@ -1,0 +1,44 @@
+# Base44 sandbox dev environment.
+#
+# This repository is a single self-contained static page: the file `car` (an HTML
+# "Car Racing Game"). There is no build step, no package manager, no framework and
+# no external service, so nothing needs to be installed or seeded.
+#
+# It is served straight from the cloned source with a plain Python runtime image,
+# so edits to `car` reach the preview without an image rebuild.
+services:
+  web:
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      # Supplied by the platform; passed through only so app code could gate
+      # sandbox-only overrides on it. Nothing here reads it today.
+      - BASE44_PREVIEW_MODE
+    volumes:
+      - ./:/app:ro
+    labels:
+      base44.project: "Car Racing Game"
+      base44.kind: "web"
+      base44.port: "3000"
+    # The source file has no `.html` extension, so it is exposed as `index.html`
+    # in a container-local directory (never written back into the repo) and
+    # re-copied once a second: editing `car` shows up in the preview in ~1s
+    # without restarting the container.
+    command:
+      - sh
+      - -ec
+      - |
+        mkdir -p /srv/site
+        ( while true; do cp -f /app/car /srv/site/index.html 2>/dev/null || true; sleep 1; done ) &
+        exec python3 -m http.server 3000 --bind 0.0.0.0 --directory /srv/site
+    ports:
+      - "3000:3000"
+    restart: on-failure
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/').status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
